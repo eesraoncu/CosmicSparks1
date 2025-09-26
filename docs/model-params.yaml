@@ -1,0 +1,3 @@
+data_versions.cams = dust_2025-06-02.nc
+data_versions.aeronet2 = 20250602_20250602_Finokalia-FKL.lev15.csv
+Başlangıç parametreleri: alpha=80, blh_min_clip_m=250, RH faktörleri (1.0/1.15/1.3/1.5), beta=0.3, risk bantları (0–25–50–75–100).

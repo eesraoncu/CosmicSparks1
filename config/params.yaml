@@ -1,0 +1,32 @@
+project:
+  crs: "EPSG:4326"
+  target_resolution_deg: 0.05
+
+paths:
+  data_root: "c:/dust-mvp/data"
+  raw_dir: "c:/dust-mvp/data/raw"
+  derived_dir: "c:/dust-mvp/data/derived"
+  admin_dir: "c:/dust-mvp/data/admin"
+  provinces_shp: "c:/dust-mvp/data/admin/turkiye_provinces.shp"
+
+apis:
+  laads:
+    token: "${LAADS_TOKEN}"
+  cams:
+    key: "${CAMS_API_KEY}"
+
+model:
+  pm25_regression:
+    # Enhanced PM2.5 model: PM2.5 = a0 + a1*AOD + a2*RH + a3*BLH + a4*DustAOD + a5*DustAOD*RH + a6*DustAOD*BLH
+    a0: 8.0      # Intercept (background PM2.5)
+    a1: 25.0     # AOD coefficient 
+    a2: 0.08     # RH coefficient (hygroscopic growth)
+    a3: -0.012   # BLH coefficient (dilution effect)
+    a4: 15.0     # Dust AOD coefficient
+    a5: 0.1      # Dust-RH interaction
+    a6: -0.005   # Dust-BLH interaction
+
+runtime:
+  threads: 4
+  write_cog: true
+
