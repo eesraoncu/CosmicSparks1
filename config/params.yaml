@@ -30,3 +30,33 @@ runtime:
   threads: 4
   write_cog: true
 
+# Email service configuration
+email:
+  smtp_server: "${SMTP_SERVER}"
+  smtp_port: 587
+  smtp_username: "${SMTP_USERNAME}"
+  smtp_password: "${SMTP_PASSWORD}"
+  from_email: "${FROM_EMAIL}"
+  from_name: "Türkiye Toz Uyarı Sistemi"
+  use_tls: true
+
+# Scheduler configuration
+scheduler:
+  daily_run_time: "06:00"  # UTC time
+  pipeline_timeout_minutes: 60
+  max_retries: 3
+  retry_delay_minutes: 15
+  alert_processing_interval_minutes: 10
+  cleanup_old_data_days: 90
+
+# Web application settings
+webapp:
+  website_url: "${WEBSITE_URL}"
+  api_url: "${API_URL}"
+  enable_cors: true
+  cors_origins: ["http://localhost:3000", "https://dustalert.tr"]
+
+# Database configuration
+database:
+  url: "${DATABASE_URL}"
+
