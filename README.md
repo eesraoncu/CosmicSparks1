@@ -1,27 +1,27 @@
 # Dust Nowcast & Alerts MVP (NASA Space Apps)
 
-## 🆕 Yeni Özellik: Akıllı Pipeline Sistemi
+## 🆕 New Feature: Intelligent Pipeline System
 
-**Tam otomatik sistem** - 81 il için:
-- ✅ En güncel gerçek veriyi otomatik bulur
-- ✅ Eksik verileri tahmin algoritması ile doldurur  
-- ✅ 3 ay geriye giderek kapsamlı analiz yapar
-- ✅ Tüm sonuçları veritabanına kaydeder
+**Fully automated system** - for all 81 provinces:
+- ✅ Automatically finds the most recent real data
+- ✅ Fills missing data using prediction algorithms
+- ✅ Performs comprehensive analysis going back 3 months
+- ✅ Saves all results to the database
 
 ```bash
-# Hemen başlat
+# Quick start
 python run_intelligent_pipeline.py
 ```
 
-📚 **Dokümantasyon:**
-- [Hızlı Başlangıç](QUICK_START.md) - 1 dakikada çalıştır
-- [Detaylı Kılavuz](INTELLIGENT_PIPELINE_GUIDE.md) - Tam dokümantasyon
-- [Sistem Özeti](SYSTEM_OVERVIEW.md) - Teknik detaylar
+📚 **Documentation:**
+- [Quick Start](QUICK_START.md) - Get running in 1 minute
+- [Detailed Guide](INTELLIGENT_PIPELINE_GUIDE.md) - Complete documentation
+- [System Overview](SYSTEM_OVERVIEW.md) - Technical details
 
 ---
 
 ## Overview
-This repository contains the **Yazılım A** (Data Ingest/QC) and **Yazılım B** (Modeling/Validation) complete pipeline for dust monitoring over Türkiye. The system provides:
+This repository contains the **Software A** (Data Ingest/QC) and **Software B** (Modeling/Validation) complete pipeline for dust monitoring over Türkiye. The system provides:
 
 - **Real-time dust monitoring** using NASA MODIS AOD and ECMWF CAMS data
 - **Province-level PM2.5 estimates** with uncertainty quantification
@@ -70,7 +70,7 @@ python -m src.validation_aeronet
 
 ## System Architecture
 
-### Data Ingestion (Yazılım A)
+### Data Ingestion (Software A)
 - **MODIS AOD**: Downloads Terra/Aqua aerosol optical depth with QC filtering
 - **CAMS Dust**: ECMWF dust fraction and forecast data
 - **ERA5 Meteorology**: Relative humidity and boundary layer height
@@ -84,7 +84,7 @@ python -m src.validation_aeronet
 5. **PM2.5 Modeling**: Enhanced regression with meteorological factors
 6. **Alert Generation**: Personalized health risk assessment
 
-### Modeling (Yazılım B)
+### Modeling (Software B)
 - **Enhanced PM2.5 Model**: `PM2.5 = a0 + a1×AOD + a2×RH + a3×BLH + a4×DustAOD + a5×DustAOD×RH + a6×DustAOD×BLH`
 - **Uncertainty Quantification**: Coverage and variability-based confidence intervals
 - **Health Risk Classification**: WHO/EU air quality standards adaptation
@@ -178,34 +178,34 @@ dust-mvp/
 - Model parameter tuning and validation
 - Data quality monitoring dashboard
 
-## ✅ TAMAMLANAN SİSTEM BİLEŞENLERİ
+## ✅ COMPLETED SYSTEM COMPONENTS
 
-### **Backend API (Yazılım C)** - ✅ TAMAMLANDI
+### **Backend API (Software C)** - ✅ COMPLETED
 - ✅ REST API endpoints (`src/api.py`)
-- ✅ User management ve preferences
+- ✅ User management and preferences
 - ✅ Email service integration (`src/email_service.py`)
 - ✅ PostgreSQL database schema (`src/database.py`)
-- ✅ Health check ve monitoring endpoints
+- ✅ Health check and monitoring endpoints
 
-### **Frontend (Yazılım D)** - ✅ TAMAMLANDI
+### **Frontend (Software D)** - ✅ COMPLETED
 - ✅ Interactive web map (`frontend/components/DustMap.tsx`)
-- ✅ Province selection ve time series
-- ✅ User registration ve alert preferences
+- ✅ Province selection and time series
+- ✅ User registration and alert preferences
 - ✅ Modern React/Next.js interface
-- ✅ Responsive design ve TailwindCSS
+- ✅ Responsive design and TailwindCSS
 
-### **Automated Operations** - ✅ TAMAMLANDI
+### **Automated Operations** - ✅ COMPLETED
 - ✅ Automated daily scheduling (`src/scheduler.py`)
 - ✅ Docker containerization
 - ✅ Email alert delivery system
-- ✅ Database management ve cleanup
+- ✅ Database management and cleanup
 
-### **Production Ready Deployment** - ✅ TAMAMLANDI
+### **Production Ready Deployment** - ✅ COMPLETED
 - ✅ Docker Compose setup (`docker-compose.yml`)
 - ✅ Nginx reverse proxy
 - ✅ PostgreSQL + PostGIS database
 - ✅ Redis caching
-- ✅ Health checks ve monitoring
+- ✅ Health checks and monitoring
 
 ## Dependencies
 
@@ -220,5 +220,3 @@ See `requirements.txt` for complete dependency list.
 ## License & Credits
 
 This project was developed for the NASA Space Apps Challenge 2024, focusing on dust monitoring and health protection in Türkiye. The system integrates multiple NASA and ECMWF data products to provide actionable health information to vulnerable populations.
-
-
