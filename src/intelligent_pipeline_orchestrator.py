@@ -108,11 +108,12 @@ class IntelligentPipelineOrchestrator:
     def get_missing_dates_for_province_after_date(self, session: Session, province_id: int, last_date: str) -> List[str]:
         """
         Bir il için belirli tarihten sonraki eksik tarihleri bul
+        Sadece gerçek veri (data_quality_score != 0.7) olan tarihleri atla
         """
         from datetime import datetime, timedelta
         
         last_date_obj = datetime.strptime(last_date, '%Y-%m-%d')
-        today = datetime.utcnow()
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         
         # Son tarihten bugüne kadar olan eksik günleri bul
         missing_dates = []
@@ -121,10 +122,11 @@ class IntelligentPipelineOrchestrator:
         while current_date < today:
             date_str = current_date.strftime('%Y-%m-%d')
             
-            # Bu tarihte veri var mı kontrol et
+            # Bu tarihte GERÇEK veri var mı kontrol et (forecast değil)
             existing = session.query(DailyStats).filter(
                 DailyStats.province_id == province_id,
-                DailyStats.date == date_str
+                DailyStats.date == date_str,
+                DailyStats.data_quality_score != 0.7  # Forecast verisini sayma
             ).first()
             
             if not existing:
@@ -137,10 +139,11 @@ class IntelligentPipelineOrchestrator:
     def get_missing_dates_for_province_no_data(self, session: Session, province_id: int) -> List[str]:
         """
         Hiç veri olmayan il için son 90 günün eksik tarihlerini bul
+        Sadece gerçek veri (data_quality_score != 0.7) olan tarihleri atla
         """
         from datetime import datetime, timedelta
         
-        today = datetime.utcnow()
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         start_date = today - timedelta(days=self.max_lookback_days)
         
         missing_dates = []
@@ -149,10 +152,11 @@ class IntelligentPipelineOrchestrator:
         while current_date < today:
             date_str = current_date.strftime('%Y-%m-%d')
             
-            # Bu tarihte veri var mı kontrol et
+            # Bu tarihte GERÇEK veri var mı kontrol et (forecast değil)
             existing = session.query(DailyStats).filter(
                 DailyStats.province_id == province_id,
-                DailyStats.date == date_str
+                DailyStats.date == date_str,
+                DailyStats.data_quality_score != 0.7  # Forecast verisini say
             ).first()
             
             if not existing:
@@ -291,7 +295,8 @@ class IntelligentPipelineOrchestrator:
         CAMS and ERA5 typically have 3-5 days delay
         """
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-        days_ago = (datetime.now() - date_obj).days
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        days_ago = (today - date_obj).days
         
         # Real satellite/reanalysis data typically available after 3-5 days
         if days_ago < 3:
@@ -508,23 +513,32 @@ class IntelligentPipelineOrchestrator:
                     )
                     logger.info(f"Province {province_name} ({province_id}): No data, need {len(missing_dates)} dates")
                 
-                # Bu il için eksik tarihleri işle
+                # Bu il için eksik tarihleri işle - SADECE TAHMIN ÜRET
+                # Gerçek veri indirme scheduler tarafından yapılır
                 for date_str in missing_dates:
-                    if self.try_run_real_pipeline_for_province(date_str, province_id):
-                        real_data_processed += 1
-                    else:
-                        # Gerçek veri yoksa tahmin üret
-                        try:
-                            prediction = self.forecast_system.predict_pm25(province_id, date_str)
-                            forecast_record = {
-                                'date': date_str,
-                                'province_id': province_id,
-                                **prediction
-                            }
-                            self.forecast_system.save_forecasts_to_database([forecast_record])
-                            forecast_data_generated += 1
-                        except Exception as e:
-                            logger.error(f"Error forecasting for province {province_id} on {date_str}: {e}")
+                    try:
+                        # Önce bu tarih için zaten veri var mı kontrol et
+                        existing = session.query(DailyStats).filter(
+                            DailyStats.province_id == province_id,
+                            DailyStats.date == date_str
+                        ).first()
+                        
+                        if existing:
+                            logger.debug(f"Data already exists for province {province_id} on {date_str}, skipping")
+                            continue
+                        
+                        # Tahmin üret
+                        prediction = self.forecast_system.predict_pm25(province_id, date_str)
+                        forecast_record = {
+                            'date': date_str,
+                            'province_id': province_id,
+                            **prediction
+                        }
+                        self.forecast_system.save_forecasts_to_database([forecast_record])
+                        forecast_data_generated += 1
+                        logger.debug(f"Generated forecast for province {province_id} on {date_str}")
+                    except Exception as e:
+                        logger.error(f"Error forecasting for province {province_id} on {date_str}: {e}")
             
             # Step 4: Final analysis
             final_analysis = self.analyze_data_coverage(session)
@@ -533,9 +547,7 @@ class IntelligentPipelineOrchestrator:
             summary = {
                 'initial_coverage_pct': analysis['coverage_pct'],
                 'final_coverage_pct': final_analysis['coverage_pct'],
-                'dates_processed_with_real_data': real_data_processed,
                 'forecast_records_generated': forecast_data_generated,
-                'total_records_added': real_data_processed + forecast_data_generated,
                 'provinces_updated': final_analysis['provinces_with_data'],
                 'status': 'success'
             }
@@ -544,8 +556,8 @@ class IntelligentPipelineOrchestrator:
             logger.info("Intelligent Pipeline Orchestrator Complete (İL BAZINDA)")
             logger.info(f"  Initial coverage: {summary['initial_coverage_pct']:.1f}%")
             logger.info(f"  Final coverage: {summary['final_coverage_pct']:.1f}%")
-            logger.info(f"  Real data dates: {summary['dates_processed_with_real_data']}")
-            logger.info(f"  Forecast records: {summary['forecast_records_generated']}")
+            logger.info(f"  Forecast records generated: {summary['forecast_records_generated']}")
+            logger.info(f"  Provinces with data: {summary['provinces_updated']}")
             logger.info("=" * 80)
             
             return summary

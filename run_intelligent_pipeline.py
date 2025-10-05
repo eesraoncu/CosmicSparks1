@@ -178,10 +178,8 @@ Examples:
             print(f"Final coverage: {summary['final_coverage_pct']:.1f}%")
             print(f"Improvement: +{summary['final_coverage_pct'] - summary['initial_coverage_pct']:.1f}%")
             print()
-            print(f"Dates processed (real data): {summary['dates_processed_with_real_data']}")
             print(f"Forecast records generated: {summary['forecast_records_generated']}")
-            print(f"Total records added: ~{summary['total_records_added']}")
-            print(f"Provinces updated: {summary['provinces_updated']}/81")
+            print(f"Provinces with data: {summary['provinces_updated']}/81")
             print("=" * 80)
             
             # Export if requested
