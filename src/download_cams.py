@@ -6,7 +6,6 @@ import os
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List
-import cdsapi
 import xarray as xr
 import numpy as np
 
@@ -15,16 +14,24 @@ class CAMSDownloader:
     """Download CAMS atmospheric composition data"""
     
     def __init__(self, api_key: str = None):
+        # Prefer ~/.cdsapirc credentials; don't require env/params
         self.api_key = api_key or os.getenv("CAMS_API_KEY")
-        if self.api_key and self.api_key != "${CAMS_API_KEY}":
-            try:
-                # Initialize CDS API client
-                self.client = cdsapi.Client()
-            except Exception as e:
-                print(f"Warning: CDS API setup failed: {e}")
-                self.client = None
-        else:
-            print("Warning: No CAMS API key found")
+        try:
+            import cdsapi  # type: ignore
+            # Use explicit parameters for better reliability
+            if self.api_key:
+                self.client = cdsapi.Client(
+                    url="https://ads.atmosphere.copernicus.eu/api",
+                    key=self.api_key,
+                    retry_max=3, 
+                    sleep_max=2, 
+                    timeout=300
+                )
+            else:
+                # Fallback to config file
+                self.client = cdsapi.Client(url="https://ads.atmosphere.copernicus.eu/api")
+        except Exception as e:
+            print(f"Warning: CDS API setup failed: {e}")
             self.client = None
     
     def download_dust_forecast(self, date: datetime, forecast_hours: List[int], 
@@ -34,26 +41,26 @@ class CAMSDownloader:
         bbox: (west, south, east, north) in degrees
         """
         if not self.client:
-            print("No CAMS client available, creating synthetic data...")
-            return self._create_synthetic_dust(date, output_dir, bbox)
+            raise Exception("CAMS API client not available. Please check your API key and configuration.")
         
         if bbox is None:
             bbox = (25.0, 35.5, 45.0, 42.5)  # Turkey bbox
         
-        # CAMS dataset and variable names
+        # CAMS dataset and variable names - use working combination
         dataset = "cams-global-atmospheric-composition-forecasts"
-        variable = "dust_aerosol_optical_depth_550nm"
+        variable = "dust_aerosol_optical_depth_550nm"  # This works!
         
-        output_file = os.path.join(output_dir, f"cams_dust_{date.strftime('%Y%m%d')}.nc")
+        output_file = os.path.join(output_dir, f"cams_dust_forecast_{date.strftime('%Y%m%d')}.nc")
         os.makedirs(output_dir, exist_ok=True)
         
         try:
+            # Use working parameters from our test - type parameter is required!
             request = {
                 'variable': variable,
                 'date': date.strftime('%Y-%m-%d'),
                 'time': '00:00',
                 'leadtime_hour': [f'{h}' for h in forecast_hours],
-                'type': 'forecast',
+                'type': 'forecast',  # This is required!
                 'area': [bbox[3], bbox[0], bbox[1], bbox[2]],  # N, W, S, E
                 'format': 'netcdf',
             }
@@ -64,31 +71,46 @@ class CAMSDownloader:
             return output_file
             
         except Exception as e:
-            print(f"Error downloading CAMS data: {e}")
-            return self._create_synthetic_dust(date, output_dir, bbox)
+            print(f"Error downloading CAMS forecast: {e}")
+            raise Exception(f"CAMS forecast download failed: {e}")
     
     def download_dust_analysis(self, date: datetime, output_dir: str, bbox: tuple = None) -> str:
         """Download CAMS dust analysis (reanalysis) for given date"""
         if not self.client:
-            return self._create_synthetic_dust(date, output_dir, bbox)
+            raise Exception("CAMS API client not available. Please check your API key and configuration.")
         
         if bbox is None:
             bbox = (25.0, 35.5, 45.0, 42.5)
         
-        dataset = "cams-global-reanalysis-eac4"
-        variable = "dust_aerosol_optical_depth_550nm"
-        
         output_file = os.path.join(output_dir, f"cams_dust_analysis_{date.strftime('%Y%m%d')}.nc")
         os.makedirs(output_dir, exist_ok=True)
+
+        # Check if date is available for reanalysis
+        from datetime import timezone
+        days_ago = (datetime.now(timezone.utc) - date).days
         
+        # CAMS reanalysis EAC4 ended in 2021, try forecast instead for recent dates
+        if date.year >= 2022 or days_ago < 60:
+            print(f"Date {date.date()} is too recent or after 2021 for CAMS reanalysis EAC4")
+            print("CAMS EAC4 reanalysis dataset covers 2003-2021 only")
+            print("Falling back to forecast data...")
+            # Try to use forecast instead
+            try:
+                return self.download_dust_forecast(date, [0], output_dir, bbox)
+            except Exception as e2:
+                print(f"Forecast fallback also failed: {e2}")
+                raise Exception(f"CAMS data not available for {date.date()}. EAC4 covers 2003-2021 only.")
+
         try:
+            # Use working combination from our test for historical data (2003-2021)
+            dataset = "cams-global-reanalysis-eac4"
+            variable = "aerosol_optical_depth_550nm"
+            
             request = {
                 'variable': variable,
-                'year': str(date.year),
-                'month': f'{date.month:02d}',
-                'day': f'{date.day:02d}',
-                'time': ['00:00', '06:00', '12:00', '18:00'],
-                'area': [bbox[3], bbox[0], bbox[1], bbox[2]],
+                'date': date.strftime('%Y-%m-%d'),
+                'time': '00:00',
+                'area': [bbox[3], bbox[0], bbox[1], bbox[2]],  # N, W, S, E
                 'format': 'netcdf',
             }
             
@@ -99,44 +121,8 @@ class CAMSDownloader:
             
         except Exception as e:
             print(f"Error downloading CAMS analysis: {e}")
-            return self._create_synthetic_dust(date, output_dir, bbox)
+            raise Exception(f"CAMS analysis download failed: {e}")
     
-    def _create_synthetic_dust(self, date: datetime, output_dir: str, bbox: tuple) -> str:
-        """Create synthetic dust data when API is not available"""
-        print("Creating synthetic CAMS dust data...")
-        
-        if bbox is None:
-            bbox = (25.0, 35.5, 45.0, 42.5)
-        
-        # Create synthetic data with realistic patterns
-        lons = np.linspace(bbox[0], bbox[2], 80)  # 0.25 degree resolution
-        lats = np.linspace(bbox[1], bbox[3], 28)
-        
-        # Synthetic dust with higher values in southeast (more dust activity)
-        rng = np.random.default_rng((abs(hash(date.date())) + 2024) % (2**32))
-        dust_base = rng.exponential(scale=0.1, size=(len(lats), len(lons)))
-        
-        # Add spatial pattern (higher in south/east)
-        lat_grid, lon_grid = np.meshgrid(lats, lons, indexing='ij')
-        south_east_factor = 1 + 2 * (42.5 - lat_grid) / 7.0 + (lon_grid - 25.0) / 20.0
-        dust_data = dust_base * south_east_factor * 0.1
-        dust_data = np.clip(dust_data, 0, 1.0)
-        
-        # Create xarray dataset
-        ds = xr.Dataset({
-            'dust_aerosol_optical_depth_550nm': (['latitude', 'longitude'], dust_data)
-        }, coords={
-            'latitude': lats,
-            'longitude': lons,
-            'time': date
-        })
-        
-        output_file = os.path.join(output_dir, f"cams_dust_synthetic_{date.strftime('%Y%m%d')}.nc")
-        os.makedirs(output_dir, exist_ok=True)
-        ds.to_netcdf(output_file)
-        
-        print(f"Created synthetic dust file: {output_file}")
-        return output_file
 
 
 def download_cams_dust_day(utc_date: datetime, params: dict, forecast_hours: List[int] = None) -> Dict[str, str]:
@@ -168,10 +154,10 @@ if __name__ == "__main__":
     # Test download
     import yaml
     
-    config_path = "../config/params.yaml"
+    config_path = "config/params.yaml"
     with open(config_path) as f:
         params = yaml.safe_load(f)
     
-    test_date = datetime(2025, 9, 20)
+    test_date = datetime(2024, 12, 1)  # Use a date that has data
     files = download_cams_dust_day(test_date, params)
     print(f"Downloaded CAMS files: {files}")

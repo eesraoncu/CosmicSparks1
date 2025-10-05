@@ -69,7 +69,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
     if (highRiskCount > 0) {
       return {
         status: 'warning',
-        message: `${highRiskCount} ilde yüksek risk seviyesi`,
+        message: `High risk level in ${highRiskCount} provinces`,
         icon: ExclamationTriangleIcon,
         color: 'text-red-600 bg-red-50 border-red-200'
       };
@@ -82,7 +82,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
     if (moderateRiskCount > 0) {
       return {
         status: 'info',
-        message: `${moderateRiskCount} ilde orta risk seviyesi`,
+        message: `Moderate risk level in ${moderateRiskCount} provinces`,
         icon: InformationCircleIcon,
         color: 'text-yellow-600 bg-yellow-50 border-yellow-200'
       };
@@ -90,7 +90,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
 
     return {
       status: 'success',
-      message: 'Tüm illerde hava kalitesi iyi seviyede',
+      message: 'Air quality is good in all provinces',
       icon: CheckCircleIcon,
       color: 'text-green-600 bg-green-50 border-green-200'
     };
@@ -107,10 +107,10 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
           <div className="flex items-center">
             <StatusIcon className="h-8 w-8 mr-4" />
             <div>
-              <h2 className="text-xl font-bold mb-1">Güncel Durum</h2>
+              <h2 className="text-xl font-bold mb-1">Current Status</h2>
               <p className="text-lg">{overallStatus.message}</p>
               <p className="text-sm opacity-75 mt-1">
-                Son güncelleme: {new Date().toLocaleString('tr-TR')}
+                Last updated: {new Date().toLocaleString('en-US')}
               </p>
             </div>
           </div>
@@ -136,7 +136,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
                 {alert.label}
               </h3>
               <p className="text-sm text-gray-600">
-                {alert.count === 1 ? '1 il' : `${alert.count} il`}
+                {alert.count === 1 ? '1 province' : `${alert.count} provinces`}
               </p>
             </div>
           ))}
@@ -161,7 +161,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
                     />
                     <div className="text-left">
                       <h3 className="font-semibold text-gray-900">
-                        {alert.label} - {alert.count} İl
+                        {alert.label} - {alert.count} Provinces
                       </h3>
                       <p className="text-sm text-gray-600">
                         {alert.provinces.map(p => p.province.name).join(', ')}
@@ -196,7 +196,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
                             </div>
                             
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Hava Kalitesi:</span>
+                              <span className="text-gray-600">Air Quality:</span>
                               <span className="font-medium">
                                 {stats.pm25 ? dataUtils.getAirQualityCategory(stats.pm25) : 'N/A'}
                               </span>
@@ -204,9 +204,9 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
                             
                             {stats.dust_event_detected && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Toz:</span>
+                                <span className="text-gray-600">Dust:</span>
                                 <span className="font-medium text-orange-600">
-                                  {stats.dust_intensity || 'Tespit Edildi'}
+                                  {stats.dust_intensity || 'Detected'}
                                 </span>
                               </div>
                             )}
@@ -221,7 +221,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
 
                           {/* Health recommendations */}
                           <div className="mt-3 pt-2 border-t border-gray-200">
-                            <p className="text-xs text-gray-600 mb-1">Sağlık Önerisi:</p>
+                            <p className="text-xs text-gray-600 mb-1">Health Advice:</p>
                             <div className="text-xs text-gray-800">
                               {dataUtils.getHealthRecommendations(alert.level, 'general')[0]}
                             </div>
@@ -233,7 +233,7 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
                     {/* General health advice for this alert level */}
                     <div className="mt-4 p-3 bg-gray-50 rounded-md">
                       <h4 className="font-semibold text-sm text-gray-900 mb-2">
-                        Genel Öneriler ({alert.label}):
+                        General Recommendations ({alert.label}):
                       </h4>
                       <ul className="text-sm text-gray-700 space-y-1">
                         {dataUtils.getHealthRecommendations(alert.level, 'general').map((rec, index) => (
@@ -255,11 +255,11 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
           <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
             <CheckCircleIcon className="h-12 w-12 text-green-600 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-green-900 mb-2">
-              Harika Haber! 🎉
+              Great News! 🎉
             </h3>
             <p className="text-green-700">
-              Şu anda hiçbir ilde uyarı seviyesinde hava kalitesi problemi bulunmuyor. 
-              Tüm illerde hava kalitesi normal seviyelerde.
+              There is currently no air quality issue at alert levels in any province. 
+              Air quality is at normal levels across all provinces.
             </p>
           </div>
         )}
@@ -270,22 +270,20 @@ const AlertsOverview: React.FC<AlertsOverviewProps> = ({ stats, provinces }) => 
             <InformationCircleIcon className="h-6 w-6 text-blue-600 mr-3 mt-0.5" />
             <div>
               <h3 className="font-semibold text-blue-900 mb-2">
-                Uyarı Sistemi Hakkında
+                About the Alert System
               </h3>
               <div className="text-sm text-blue-800 space-y-2">
                 <p>
-                  Bu uyarılar NASA MODIS uydu verileri ve ECMWF CAMS toz tahmin modelleri 
-                  kullanılarak hesaplanmaktadır.
+                  These alerts are calculated using NASA MODIS satellite data and ECMWF CAMS dust forecast models.
                 </p>
                 <p>
-                  Kişiselleştirilmiş uyarılar almak için{' '}
+                  To receive personalized alerts{' '}
                   <a href="/register" className="font-semibold underline hover:text-blue-900">
-                    ücretsiz kaydolabilirsiniz
+                    sign up for free
                   </a>.
                 </p>
                 <p>
-                  Veriler günlük olarak güncellenmekte ve 48-72 saat öncesinden 
-                  tahmin sunulmaktadır.
+                  Data is updated daily and provides forecasts 48-72 hours in advance.
                 </p>
               </div>
             </div>

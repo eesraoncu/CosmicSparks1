@@ -12,9 +12,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 import pandas as pd
+import os
+import json as _json
+import base64
+import hmac
+import hashlib
+from passlib.context import CryptContext
 
-from .database import get_db, db_manager, User, Province, DailyStats, Alert
-from .email_service import EmailService
+from database import get_db, db_manager, User, Province, DailyStats, Alert
+from email_service import EmailService
 
 # Pydantic models for API
 class UserCreate(BaseModel):
@@ -134,6 +140,42 @@ app.add_middleware(
 
 # Security
 security = HTTPBearer()
+JWT_ALG = "HS256"
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me")
+# Use pbkdf2_sha256 to avoid requiring external bcrypt backend
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+
+def _b64url(data: bytes) -> bytes:
+    return base64.urlsafe_b64encode(data).rstrip(b"=")
+
+
+def _sign(data: bytes) -> bytes:
+    return _b64url(hmac.new(JWT_SECRET.encode(), data, hashlib.sha256).digest())
+
+
+def create_jwt(payload: Dict[str, Any]) -> str:
+    header = {"alg": JWT_ALG, "typ": "JWT"}
+    header_b = _b64url(_json.dumps(header, separators=(",", ":")).encode())
+    payload_b = _b64url(_json.dumps(payload, default=str, separators=(",", ":")).encode())
+    signing_input = header_b + b"." + payload_b
+    signature = _sign(signing_input)
+    return (signing_input + b"." + signature).decode()
+
+
+def verify_jwt(token: str) -> Optional[Dict[str, Any]]:
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        signing_input = (parts[0] + "." + parts[1]).encode()
+        expected = _sign(signing_input).decode()
+        if not hmac.compare_digest(expected, parts[2]):
+            return None
+        payload_json = base64.urlsafe_b64decode(parts[1] + "==")
+        return _json.loads(payload_json)
+    except Exception:
+        return None
 
 # Initialize email service
 email_service = EmailService()
@@ -147,6 +189,73 @@ async def startup_event():
     # Insert basic province data
     with db_manager.get_session() as session:
         db_manager.insert_provinces(session)
+# Auth endpoints (email-based simple login)
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+async def login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == req.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.password_hash or not pwd_context.verify(req.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = create_jwt({"sub": user.id, "email": user.email})
+    return LoginResponse(access_token=token, user=user)
+
+# Registration with password
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    health_group: str = Field(default="general", pattern="^(general|sensitive|respiratory|cardiac)$")
+    province_ids: List[int] = Field(default_factory=list)
+
+
+@app.post("/api/auth/register", response_model=UserResponse)
+async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    existing = db_manager.get_user_by_email(db, req.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+    valid_provinces = []
+    if req.province_ids:
+        valid_provinces = db.query(Province).filter(Province.id.in_(req.province_ids)).all()
+        if len(valid_provinces) != len(req.province_ids):
+            raise HTTPException(status_code=400, detail="Invalid province IDs")
+    user_data = {
+        "email": req.email,
+        "health_group": req.health_group,
+        "province_ids": req.province_ids or [6],
+    }
+    user = db_manager.create_user(db, user_data)
+    user.password_hash = pwd_context.hash(req.password)
+    user.email_verified = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
+    token = credentials.credentials
+    payload = verify_jwt(token)
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.query(User).filter(User.id == payload["sub"]).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def me(user: User = Depends(get_current_user)):
+    return user
 
 
 # User management endpoints
@@ -304,14 +413,44 @@ async def get_current_stats(
     province_ids: List[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """Get current day statistics"""
-    today = datetime.utcnow().strftime('%Y-%m-%d')
-    query = db.query(DailyStats).filter(DailyStats.date == today)
+    """Get current day statistics (including forecasts) - per province latest data"""
+    from datetime import datetime, timedelta
     
+    # 3 ay öncesi tarihini hesapla
+    three_months_ago = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+    
+    # Eğer belirli iller isteniyorsa
     if province_ids:
-        query = query.filter(DailyStats.province_id.in_(province_ids))
+        target_provinces = province_ids
+    else:
+        # Tüm illeri al
+        all_provinces = db.query(Province).all()
+        target_provinces = [p.id for p in all_provinces]
     
-    stats = query.order_by(DailyStats.province_id).all()
+    stats = []
+    
+    # Her il için ayrı ayrı en yakın tarihi bul
+    for province_id in target_provinces:
+        # Bu il için 3 ay öncesinden bugüne kadar en son gerçek veriyi bul
+        latest_real_data = db.query(DailyStats).filter(
+            DailyStats.province_id == province_id,
+            DailyStats.date >= three_months_ago,
+            DailyStats.data_quality_score != 0.7  # Tahmin verilerini hariç tut
+        ).order_by(DailyStats.date.desc()).first()
+        
+        if latest_real_data:
+            # Gerçek veri bulundu
+            stats.append(latest_real_data)
+        else:
+            # Gerçek veri yoksa, tahmin verilerini de dahil et
+            latest_any_data = db.query(DailyStats).filter(
+                DailyStats.province_id == province_id,
+                DailyStats.date >= three_months_ago
+            ).order_by(DailyStats.date.desc()).first()
+            
+            if latest_any_data:
+                stats.append(latest_any_data)
+    
     return stats
 
 
@@ -433,6 +572,82 @@ async def upload_system_status(
         return {"message": "System status recorded"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to record status: {str(e)}")
+
+
+# Intelligent Pipeline endpoints
+@app.post("/api/pipeline/run-intelligent")
+async def run_intelligent_pipeline(
+    max_lookback_days: int = Query(90, ge=1, le=365),
+    min_data_age_days: int = Query(7, ge=1, le=30),
+    analyze_only: bool = Query(False)
+):
+    """
+    Run intelligent pipeline orchestrator
+    Automatically finds latest data for all provinces and fills gaps
+    """
+    try:
+        from .intelligent_pipeline_orchestrator import IntelligentPipelineOrchestrator
+        
+        orchestrator = IntelligentPipelineOrchestrator(
+            max_lookback_days=max_lookback_days,
+            min_data_age_days=min_data_age_days
+        )
+        
+        if analyze_only:
+            with db_manager.get_session() as session:
+                analysis = orchestrator.analyze_data_coverage(session)
+            return {
+                "status": "analysis_complete",
+                "analysis": analysis
+            }
+        else:
+            summary = orchestrator.run_intelligent_pipeline()
+            return {
+                "status": "success",
+                "summary": summary
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+
+
+@app.get("/api/pipeline/coverage-analysis")
+async def get_coverage_analysis(
+    max_lookback_days: int = Query(90, ge=1, le=365)
+):
+    """Get detailed coverage analysis for all provinces"""
+    try:
+        from .intelligent_pipeline_orchestrator import IntelligentPipelineOrchestrator
+        
+        orchestrator = IntelligentPipelineOrchestrator(max_lookback_days=max_lookback_days)
+        
+        with db_manager.get_session() as session:
+            analysis = orchestrator.analyze_data_coverage(session)
+            latest_data = orchestrator.get_latest_real_data_per_province(session)
+            
+            # Get province names
+            provinces = {}
+            for province_id, latest_date in latest_data.items():
+                province = session.query(Province).filter(Province.id == province_id).first()
+                if province:
+                    days_old = None
+                    if latest_date:
+                        days_old = (datetime.utcnow() - datetime.strptime(latest_date, '%Y-%m-%d')).days
+                    
+                    provinces[province_id] = {
+                        "name": province.name,
+                        "latest_date": latest_date,
+                        "days_old": days_old,
+                        "has_recent_data": days_old is not None and days_old <= 7 if days_old else False
+                    }
+        
+        return {
+            "analysis": analysis,
+            "provinces": provinces
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 # Health check

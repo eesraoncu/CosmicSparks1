@@ -38,9 +38,9 @@ class UserProfile:
     health_group: HealthGroup
     
     # Custom thresholds (PM2.5 μg/m³)
-    pm25_low_threshold: float = 25.0
-    pm25_moderate_threshold: float = 50.0
-    pm25_high_threshold: float = 75.0
+    pm25_low_threshold: float = 15.0
+    pm25_moderate_threshold: float = 25.0
+    pm25_high_threshold: float = 50.0
     
     # Dust-specific thresholds
     dust_aod_threshold: float = 0.15
@@ -92,10 +92,10 @@ class PersonalizedAlertSystem:
         
         # Health group thresholds (PM2.5 μg/m³)
         self.health_thresholds = {
-            HealthGroup.GENERAL: {"low": 25, "moderate": 50, "high": 75},
-            HealthGroup.SENSITIVE: {"low": 15, "moderate": 35, "high": 55},
-            HealthGroup.RESPIRATORY: {"low": 12, "moderate": 25, "high": 40},
-            HealthGroup.CARDIAC: {"low": 15, "moderate": 30, "high": 50},
+            HealthGroup.GENERAL: {"low": 15, "moderate": 25, "high": 50},
+            HealthGroup.SENSITIVE: {"low": 12, "moderate": 20, "high": 35},
+            HealthGroup.RESPIRATORY: {"low": 10, "moderate": 15, "high": 25},
+            HealthGroup.CARDIAC: {"low": 8, "moderate": 12, "high": 20},
         }
     
     def _load_user_profiles(self) -> Dict[str, UserProfile]:
@@ -346,15 +346,25 @@ class PersonalizedAlertSystem:
                         item['timestamp'] = datetime.fromisoformat(item['timestamp'])
                     queue = queue_data
             except Exception as e:
-                print(f"Error loading alert queue: {e}")
+                # Backup invalid JSON and continue with an empty queue
+                try:
+                    backup_path = self.alert_queue_file + ".bak"
+                    with open(self.alert_queue_file, 'r', errors='ignore') as bad:
+                        bad_content = bad.read()
+                    with open(backup_path, 'w', encoding='utf-8') as out:
+                        out.write(bad_content)
+                    print(f"Error loading alert queue: {e}. Backed up to {backup_path} and continuing with empty queue.")
+                except Exception as be:
+                    print(f"Error backing up invalid alert queue: {be}")
         
         # Add new alerts
         for alert in alerts:
             alert_dict = alert.__dict__.copy()
-            alert_dict['alert_level'] = alert.alert_level.value
-            alert_dict['timestamp'] = alert.timestamp.isoformat()
-            # Convert boolean values to strings for JSON compatibility
-            alert_dict['dust_detected'] = bool(alert_dict['dust_detected'])
+            # Convert enums and datetime to JSON-serializable types
+            alert_dict['alert_level'] = alert.alert_level.value if hasattr(alert.alert_level, 'value') else str(alert.alert_level)
+            alert_dict['timestamp'] = alert.timestamp.isoformat() if hasattr(alert.timestamp, 'isoformat') else str(alert.timestamp)
+            # Ensure booleans are proper JSON booleans
+            alert_dict['dust_detected'] = bool(alert_dict.get('dust_detected', False))
             queue.append(alert_dict)
         
         # Save queue

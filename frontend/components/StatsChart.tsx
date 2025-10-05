@@ -16,10 +16,10 @@ const StatsChart: React.FC<StatsChartProps> = ({ data }) => {
     return (
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          📊 Hava Kalitesi İstatistikleri
+          📊 Air Quality Statistics
         </h3>
         <div className="text-gray-500 text-center py-8">
-          Veri yükleniyor...
+          Loading data...
         </div>
       </div>
     );
@@ -31,7 +31,7 @@ const StatsChart: React.FC<StatsChartProps> = ({ data }) => {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">
-        📊 Hava Kalitesi İstatistikleri
+        📊 Air Quality Statistics
       </h3>
       
       <div className="space-y-4">
@@ -41,7 +41,7 @@ const StatsChart: React.FC<StatsChartProps> = ({ data }) => {
               <span className="font-medium text-gray-700">{item.province}</span>
               {item.dustDetected && (
                 <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                  🌪️ Toz
+                  🌪️ Dust
                 </span>
               )}
             </div>
@@ -83,7 +83,7 @@ const StatsChart: React.FC<StatsChartProps> = ({ data }) => {
 
       {data.length > 5 && (
         <div className="text-center text-sm text-gray-500 mt-4">
-          +{data.length - 5} daha fazla il...
+          +{data.length - 5} more provinces...
         </div>
       )}
 
@@ -93,19 +93,19 @@ const StatsChart: React.FC<StatsChartProps> = ({ data }) => {
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>İyi (0-25)</span>
+              <span>Good (0-25)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-              <span>Orta (25-35)</span>
+              <span>Moderate (25-35)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500 rounded"></div>
-              <span>Hassas (35-50)</span>
+              <span>Unhealthy for Sensitive Groups (35-50)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-red-500 rounded"></div>
-              <span>Zararlı (50+)</span>
+              <span>Unhealthy (50+)</span>
             </div>
           </div>
         </div>

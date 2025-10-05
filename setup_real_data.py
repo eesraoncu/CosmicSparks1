@@ -31,9 +31,9 @@ def install_package(package):
 def check_api_keys():
     """Check if API keys are configured"""
     keys = {
-        'LAADS_TOKEN': 'NASA LAADS/Earthdata token',
-        'CAMS_API_KEY': 'Copernicus CAMS API key',
-        'CDS_API_KEY': 'Copernicus CDS API key (for ERA5)'
+        'LAADS_TOKEN': 'eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImVzcmFvbmN1MSIsImV4cCI6MTc2NDExNTE5OSwiaWF0IjoxNzU4ODkwNTA4LCJpc3MiOiJodHRwczovL3Vycy5lYXJ0aGRhdGEubmFzYS5nb3YiLCJpZGVudGl0eV9wcm92aWRlciI6ImVkbF9vcHMiLCJhY3IiOiJlZGwiLCJhc3N1cmFuY2VfbGV2ZWwiOjN9.3WLiqkdqkjrlmWJS2mBIof02BsZRQt3HEgsdTBCzHHoeaYaW5jGmZ40pl8C5exD52V2E2I2LxBbSgOU7I4jOAfwDkSmrFr8YbKVROm_20fiE7GaxxueV9KvP3fBtQeL_BO_dFkjrLIf18rC5Hm3YVsK5JFnDJzXFOAYlVG6vqcKzeeB9DUzYCZF8eO5rUavR8CDRFYyTCMRw-N5nlGzYvZQUIEEuLXdBX5-iyvu0WmaZ0-9UdpnOJefP-xmIbqmZTBl-CS4vFpeozUvulrR7Dqu9LJiy7SgTk33Xj0XpoaNL66O1QDbJW3RgtlX_dFNZFmvoGnYDKA1cBzbU09o1tQ',
+        'CAMS_API_KEY': 'c46f9bcc-6720-4d14-aea5-0eebd4b700a9',
+        'CDS_API_KEY': 'c46f9bcc-6720-4d14-aea5-0eebd4b700a9'
     }
     
     missing_keys = []

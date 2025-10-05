@@ -4,5 +4,11 @@
     "files": [
       "static/chunks/components_LeafletMap_tsx.js"
     ]
+  },
+  "pages\\map.tsx -> @/components/DustMap": {
+    "id": "pages\\map.tsx -> @/components/DustMap",
+    "files": [
+      "static/chunks/components_DustMap_tsx.js"
+    ]
   }
 }

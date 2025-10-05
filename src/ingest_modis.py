@@ -14,7 +14,7 @@ try:
     from pyhdf.SD import SD, SDC
     HDF_AVAILABLE = True
 except ImportError:
-    print("Warning: pyhdf not available, using synthetic data")
+    # Don't print noisy warnings at import time; we'll warn when needed
     HDF_AVAILABLE = False
 
 try:

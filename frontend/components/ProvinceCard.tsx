@@ -26,7 +26,7 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
     ? dataUtils.getAlertLevel(stats.pm25 || 0, stats.dust_event_detected, stats.dust_aod_mean)
     : 'none';
   
-  const airQuality = stats?.pm25 ? dataUtils.getAirQualityCategory(stats.pm25) : 'Veri Yok';
+  const airQuality = stats?.pm25 ? dataUtils.getAirQualityCategory(stats.pm25) : 'No Data';
   const alertColor = ALERT_LEVEL_COLORS[alertLevel as keyof typeof ALERT_LEVEL_COLORS];
   
   // Get CSS class for air quality
@@ -60,7 +60,7 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
         <div 
           className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
           style={{ backgroundColor: alertColor }}
-          title={`Uyarı seviyesi: ${alertLevel}`}
+          title={`Alert level: ${alertLevel}`}
         />
       </div>
 
@@ -77,20 +77,14 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
 
           {/* Air quality category */}
           <div className="flex justify-between items-center">
-            <span className="text-gray-600">Hava Kalitesi:</span>
+            <span className="text-gray-600">Air Quality:</span>
             <span className={`font-semibold text-sm px-2 py-1 rounded ${
               airQuality === 'Good' ? 'bg-green-100 text-green-800' :
               airQuality === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
               airQuality.includes('Unhealthy') ? 'bg-red-100 text-red-800' :
               'bg-gray-100 text-gray-800'
             }`}>
-              {airQuality === 'Unhealthy for Sensitive Groups' ? 'Hassas için Zararlı' :
-               airQuality === 'Good' ? 'İyi' :
-               airQuality === 'Moderate' ? 'Orta' :
-               airQuality === 'Unhealthy' ? 'Zararlı' :
-               airQuality === 'Very Unhealthy' ? 'Çok Zararlı' :
-               airQuality === 'Hazardous' ? 'Tehlikeli' :
-               airQuality}
+              {airQuality}
             </span>
           </div>
 
@@ -99,7 +93,7 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <ExclamationTriangleIcon className="h-4 w-4 text-orange-500 mr-1" />
-                <span className="text-sm text-gray-600">Toz Fırtınası:</span>
+                <span className="text-sm text-gray-600">Dust Storm:</span>
               </div>
               <span className="text-sm font-semibold text-orange-600">
                 {stats.dust_intensity || 'Tespit Edildi'}
@@ -118,7 +112,7 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
               {/* Dust AOD */}
               {stats.dust_aod_mean && stats.dust_aod_mean > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Toz AOD:</span>
+                  <span className="text-gray-600">Dust AOD:</span>
                   <span className="font-medium">{dataUtils.formatAOD(stats.dust_aod_mean)}</span>
                 </div>
               )}
@@ -126,21 +120,21 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
               {/* Meteorological data */}
               {stats.rh_mean && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Nem:</span>
+                  <span className="text-gray-600">Humidity:</span>
                   <span className="font-medium">{Math.round(stats.rh_mean)}%</span>
                 </div>
               )}
 
               {stats.blh_mean && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Sınır Katman:</span>
+                  <span className="text-gray-600">Boundary Layer:</span>
                   <span className="font-medium">{Math.round(stats.blh_mean)}m</span>
                 </div>
               )}
 
               {/* Data quality */}
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Veri Kalitesi:</span>
+                <span className="text-gray-600">Data Quality:</span>
                 <span className="font-medium">
                   {Math.round((stats.data_quality_score || 0) * 100)}%
                 </span>
@@ -150,13 +144,13 @@ const ProvinceCard: React.FC<ProvinceCardProps> = ({
 
           {/* Last update */}
           <div className="text-xs text-gray-500 pt-2">
-            Son güncelleme: {dataUtils.formatDate(stats.date)}
+            Last updated: {dataUtils.formatDate(stats.date)}
           </div>
         </div>
       ) : (
         <div className="flex items-center justify-center py-8 text-gray-500">
           <CloudIcon className="h-8 w-8 mr-2" />
-          <span>Veri bulunamadı</span>
+          <span>No data available</span>
         </div>
       )}
 

@@ -21,6 +21,7 @@ class User(Base):
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -28,10 +29,10 @@ class User(Base):
     health_group = Column(String(50), default='general')  # general, sensitive, respiratory, cardiac
     province_ids = Column(JSON)  # List of province IDs to monitor
     
-    # Alert thresholds (PM2.5 μg/m³)
-    pm25_low_threshold = Column(Float, default=25.0)
-    pm25_moderate_threshold = Column(Float, default=50.0)
-    pm25_high_threshold = Column(Float, default=75.0)
+    # Alert thresholds (PM2.5 μg/m³) - Lowered for more alerts
+    pm25_low_threshold = Column(Float, default=15.0)
+    pm25_moderate_threshold = Column(Float, default=25.0)
+    pm25_high_threshold = Column(Float, default=35.0)
     dust_aod_threshold = Column(Float, default=0.15)
     
     # Notification preferences
@@ -163,6 +164,54 @@ class DatabaseManager:
     def create_tables(self):
         """Create all database tables"""
         Base.metadata.create_all(bind=self.engine)
+        # After ensuring base tables exist, run minimal migrations for existing DBs
+        try:
+            self._migrate_users_table()
+        except Exception:
+            # Best-effort migration; avoid crashing startup
+            pass
+
+    def _migrate_users_table(self) -> None:
+        """Ensure required columns exist on users table (idempotent)."""
+        from sqlalchemy import text
+        with self.engine.connect() as conn:
+            # Fetch existing columns
+            result = conn.execute(text(
+                """
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'users'
+                """
+            ))
+            existing_cols = {row[0] for row in result}
+
+            # Define expected columns and DDL types for PostgreSQL
+            expected: Dict[str, str] = {
+                'password_hash': 'VARCHAR(255)',
+                'created_at': 'TIMESTAMP',
+                'updated_at': 'TIMESTAMP',
+                'health_group': 'VARCHAR(50)',
+                'province_ids': 'JSON',
+                'pm25_low_threshold': 'DOUBLE PRECISION',
+                'pm25_moderate_threshold': 'DOUBLE PRECISION',
+                'pm25_high_threshold': 'DOUBLE PRECISION',
+                'dust_aod_threshold': 'DOUBLE PRECISION',
+                'notify_forecast': 'BOOLEAN',
+                'notify_current': 'BOOLEAN',
+                'quiet_hours_start': 'INTEGER',
+                'quiet_hours_end': 'INTEGER',
+                'max_alerts_per_day': 'INTEGER',
+                'is_active': 'BOOLEAN',
+                'email_verified': 'BOOLEAN',
+                'verification_token': 'VARCHAR(255)',
+                'last_alert_time': 'TIMESTAMP',
+                'daily_alert_count': 'INTEGER',
+                'last_alert_date': 'VARCHAR(10)'
+            }
+
+            for col, ddl in expected.items():
+                if col not in existing_cols:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {ddl}"))
+            conn.commit()
         
     def get_session(self) -> Session:
         """Get database session"""

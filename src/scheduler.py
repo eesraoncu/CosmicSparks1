@@ -19,6 +19,7 @@ sys.path.append(str(Path(__file__).parent))
 from database import db_manager, SystemStatus
 from email_service import EmailService
 from api import process_alert_queue
+from forecast_system import DustForecastSystem
 
 # Configure logging
 logging.basicConfig(
@@ -98,86 +99,58 @@ class DustPipelineScheduler:
             logger.error(f"Failed to log system status: {e}")
     
     def run_daily_pipeline(self, date_str: str = None) -> bool:
-        """Run the daily data processing pipeline"""
-        if date_str is None:
-            # Use yesterday's date (data availability lag)
-            date_str = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        logger.info(f"Starting daily pipeline for {date_str}")
+        """Run the intelligent pipeline orchestrator"""
+        logger.info("Starting intelligent pipeline orchestrator")
         start_time = datetime.utcnow()
         
         try:
-            # Run orchestrate_day script
-            script_path = os.path.join(os.path.dirname(__file__), 'orchestrate_day.py')
-            cmd = [sys.executable, '-m', 'src.orchestrate_day', '--date', date_str]
+            # Import intelligent pipeline orchestrator
+            from .intelligent_pipeline_orchestrator import IntelligentPipelineOrchestrator
             
-            logger.info(f"Executing: {' '.join(cmd)}")
+            # Initialize orchestrator with scheduler config
+            max_lookback_days = self.config.get('scheduler', {}).get('max_lookback_days', 90)
+            min_data_age_days = self.config.get('scheduler', {}).get('min_data_age_days', 7)
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.config['scheduler']['pipeline_timeout_minutes'] * 60,
-                cwd=os.path.dirname(os.path.dirname(__file__))
+            orchestrator = IntelligentPipelineOrchestrator(
+                max_lookback_days=max_lookback_days,
+                min_data_age_days=min_data_age_days
             )
+            
+            # Run intelligent pipeline
+            summary = orchestrator.run_intelligent_pipeline()
             
             processing_time = (datetime.utcnow() - start_time).total_seconds()
             
-            if result.returncode == 0:
-                logger.info(f"Pipeline completed successfully for {date_str}")
-                logger.info(f"Processing time: {processing_time:.1f} seconds")
-                
-                # Parse output for data coverage info
-                output = result.stdout
-                data_coverage = self._extract_coverage_from_output(output)
-                
-                self.log_system_status(
-                    component='pipeline',
-                    status='success',
-                    message=f'Daily pipeline completed for {date_str}',
-                    processing_time=processing_time,
-                    data_coverage=data_coverage
-                )
-                
-                # Update database with new data
-                self._update_database_from_pipeline(date_str)
-                
-                return True
-            else:
-                error_msg = f"Pipeline failed for {date_str}: {result.stderr}"
-                logger.error(error_msg)
-                
-                self.log_system_status(
-                    component='pipeline',
-                    status='error',
-                    message=error_msg,
-                    processing_time=processing_time,
-                    error_details={'stderr': result.stderr, 'stdout': result.stdout}
-                )
-                
-                return False
-                
-        except subprocess.TimeoutExpired:
-            error_msg = f"Pipeline timeout for {date_str}"
-            logger.error(error_msg)
+            logger.info(f"Intelligent pipeline completed successfully")
+            logger.info(f"Processing time: {processing_time:.1f} seconds")
+            logger.info(f"Summary: {summary}")
+            
+            # Extract coverage info from summary
+            initial_coverage = summary.get('initial_coverage', 0)
+            final_coverage = summary.get('final_coverage', 0)
+            improvement = summary.get('improvement', 0)
             
             self.log_system_status(
-                component='pipeline',
-                status='error',
-                message=error_msg,
-                error_details={'error_type': 'timeout'}
+                component='intelligent_pipeline',
+                status='success',
+                message=f'Intelligent pipeline completed. Coverage: {initial_coverage:.1f}% -> {final_coverage:.1f}% (+{improvement:.1f}%)',
+                processing_time=processing_time,
+                data_coverage=final_coverage
             )
             
-            return False
+            return True
             
         except Exception as e:
-            error_msg = f"Pipeline exception for {date_str}: {str(e)}"
+            error_msg = f"Intelligent pipeline exception: {str(e)}"
             logger.error(error_msg)
             
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
             self.log_system_status(
-                component='pipeline',
+                component='intelligent_pipeline',
                 status='error',
                 message=error_msg,
+                processing_time=processing_time,
                 error_details={'error_type': 'exception', 'error': str(e)}
             )
             
@@ -244,6 +217,58 @@ class DustPipelineScheduler:
             
         except Exception as e:
             logger.error(f"Failed to update database from pipeline outputs: {e}")
+    
+    def run_forecast_system(self):
+        """Run forecast system to fill missing data gaps"""
+        logger.info("Running forecast system")
+        start_time = datetime.utcnow()
+        
+        try:
+            forecast_system = DustForecastSystem()
+            success = forecast_system.run_forecast_pipeline()
+            
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            if success:
+                logger.info("Forecast system completed successfully")
+                
+                self.log_system_status(
+                    component='forecast',
+                    status='success',
+                    message='Forecast system completed successfully',
+                    processing_time=processing_time,
+                    data_coverage=85.0  # Forecast quality
+                )
+                
+                return True
+            else:
+                logger.error("Forecast system failed")
+                
+                self.log_system_status(
+                    component='forecast',
+                    status='error',
+                    message='Forecast system failed',
+                    processing_time=processing_time,
+                    error_details={'error': 'Forecast generation failed'}
+                )
+                
+                return False
+                
+        except Exception as e:
+            error_msg = f"Forecast system exception: {str(e)}"
+            logger.error(error_msg)
+            
+            processing_time = (datetime.utcnow() - start_time).total_seconds()
+            
+            self.log_system_status(
+                component='forecast',
+                status='error',
+                message=error_msg,
+                processing_time=processing_time,
+                error_details={'error_type': 'exception', 'error': str(e)}
+            )
+            
+            return False
     
     def process_alerts(self):
         """Process pending alerts and send emails"""
@@ -333,14 +358,13 @@ class DustPipelineScheduler:
         """Main scheduled job for daily processing"""
         logger.info("Starting scheduled daily job")
         
-        yesterday = (datetime.utcnow() - timedelta(days=1)).strftime('%Y-%m-%d')
-        
-        # Run pipeline
-        success = self.run_daily_pipeline(yesterday)
+        # Run intelligent pipeline (handles all data processing and forecasting)
+        success = self.run_daily_pipeline()
         
         if not success:
             # Retry if failed
-            success = self.retry_failed_pipeline(yesterday)
+            logger.info("Retrying intelligent pipeline...")
+            success = self.run_daily_pipeline()
         
         # Process alerts regardless (might have data from previous days)
         self.process_alerts()

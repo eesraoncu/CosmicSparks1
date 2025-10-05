@@ -22,9 +22,15 @@ def process_era5_netcdf(netcdf_path: str, params: dict) -> dict:
         
         results = {}
         
-        # Process relative humidity
-        if 'relative_humidity' in ds.variables:
-            rh_data = ds['relative_humidity']
+        # Relative humidity: handle common CDS names or calculate from temperature and dewpoint
+        rh_var = None
+        for name in ['relative_humidity', 'r', '2m_relative_humidity']:
+            if name in ds.variables:
+                rh_var = name
+                break
+        
+        if rh_var is not None:
+            rh_data = ds[rh_var]
             if 'time' in rh_data.dims:
                 rh_data = rh_data.mean(dim='time')  # Daily average
             
@@ -35,10 +41,64 @@ def process_era5_netcdf(netcdf_path: str, params: dict) -> dict:
                 method='linear'
             )
             results['rh'] = rh_regridded.values
+        else:
+            # Calculate relative humidity from temperature and dewpoint
+            temp_var = None
+            dewpoint_var = None
+            
+            for name in ['2m_temperature', 't2m', 'temperature']:
+                if name in ds.variables:
+                    temp_var = name
+                    break
+            
+            for name in ['2m_dewpoint_temperature', 'd2m', 'dewpoint']:
+                if name in ds.variables:
+                    dewpoint_var = name
+                    break
+            
+            if temp_var is not None and dewpoint_var is not None:
+                print(f"Calculating relative humidity from {temp_var} and {dewpoint_var}")
+                temp_data = ds[temp_var]
+                dewpoint_data = ds[dewpoint_var]
+                
+                if 'time' in temp_data.dims:
+                    temp_data = temp_data.mean(dim='time')
+                if 'time' in dewpoint_data.dims:
+                    dewpoint_data = dewpoint_data.mean(dim='time')
+                
+                # Convert from Kelvin to Celsius
+                temp_c = temp_data - 273.15
+                dewpoint_c = dewpoint_data - 273.15
+                
+                # Calculate relative humidity using Magnus formula
+                # RH = 100 * exp((17.625 * Td) / (243.04 + Td)) / exp((17.625 * T) / (243.04 + T))
+                rh = 100 * np.exp((17.625 * dewpoint_c) / (243.04 + dewpoint_c)) / np.exp((17.625 * temp_c) / (243.04 + temp_c))
+                
+                # Interpolate to target grid
+                rh_regridded = rh.interp(
+                    latitude=target_lats,
+                    longitude=target_lons,
+                    method='linear'
+                )
+                results['rh'] = rh_regridded.values
+                
+                # Flatten to 2D if needed
+                if len(results['rh'].shape) > 2:
+                    results['rh'] = results['rh'].squeeze()
+                    # If still not 2D, take the first slice
+                    if len(results['rh'].shape) > 2:
+                        results['rh'] = results['rh'][0]
+            else:
+                print("Warning: No temperature/dewpoint data found for RH calculation")
         
-        # Process boundary layer height
-        if 'boundary_layer_height' in ds.variables:
-            blh_data = ds['boundary_layer_height']
+        # Boundary layer height: handle common CDS names
+        blh_var = None
+        for name in ['boundary_layer_height', 'blh']:
+            if name in ds.variables:
+                blh_var = name
+                break
+        if blh_var is not None:
+            blh_data = ds[blh_var]
             if 'time' in blh_data.dims:
                 blh_data = blh_data.mean(dim='time')  # Daily average
             
@@ -49,6 +109,13 @@ def process_era5_netcdf(netcdf_path: str, params: dict) -> dict:
                 method='linear'
             )
             results['blh'] = blh_regridded.values
+            
+            # Flatten to 2D if needed
+            if len(results['blh'].shape) > 2:
+                results['blh'] = results['blh'].squeeze()
+                # If still not 2D, take the first slice
+                if len(results['blh'].shape) > 2:
+                    results['blh'] = results['blh'][0]
         
         ds.close()
         return results
@@ -104,6 +171,17 @@ def create_synthetic_era5(utc_date: datetime, params: dict) -> dict:
     }
 
 
+def is_date_available_for_era5(date: datetime) -> bool:
+    """
+    Check if date is likely available for ERA5 data
+    ERA5 typically has 5-7 days delay for final data
+    """
+    from datetime import timezone
+    days_ago = (datetime.now(timezone.utc) - date).days
+    # Conservative estimate: data available after 7 days
+    return days_ago >= 7
+
+
 def ingest_era5_day(utc_date: datetime, params: dict) -> dict:
     """
     Complete ERA5 meteorological data ingestion pipeline
@@ -112,21 +190,28 @@ def ingest_era5_day(utc_date: datetime, params: dict) -> dict:
     out_dir = params["paths"]["derived_dir"]
     os.makedirs(out_dir, exist_ok=True)
     
-    # Try to download real ERA5 data
-    try:
-        era5_file = download_era5_day(utc_date, params)
-        print(f"Downloaded ERA5 file: {era5_file}")
-        
-        # Process real data
-        era5_data = process_era5_netcdf(era5_file, params)
-        if era5_data:
-            print("Processed real ERA5 data")
-        else:
-            print("ERA5 processing failed, using synthetic")
-            era5_data = create_synthetic_era5(utc_date, params)
-    except Exception as e:
-        print(f"ERA5 download/processing failed: {e}")
+    # Check if date is too recent for real data
+    if not is_date_available_for_era5(utc_date):
+        days_ago = (datetime.utcnow() - utc_date).days
+        print(f"Date {utc_date.date()} is too recent ({days_ago} days ago) for ERA5 final data")
+        print("Using synthetic meteorological data instead...")
         era5_data = create_synthetic_era5(utc_date, params)
+    else:
+        # Try to download real ERA5 data
+        try:
+            era5_file = download_era5_day(utc_date, params)
+            print(f"Downloaded ERA5 file: {era5_file}")
+            
+            # Process real data
+            era5_data = process_era5_netcdf(era5_file, params)
+            if era5_data:
+                print("Processed real ERA5 data")
+            else:
+                print("ERA5 processing failed, using synthetic")
+                era5_data = create_synthetic_era5(utc_date, params)
+        except Exception as e:
+            print(f"ERA5 download/processing failed: {e}")
+            era5_data = create_synthetic_era5(utc_date, params)
     
     # Save to GeoTIFF files
     res = float(params["project"]["target_resolution_deg"])
@@ -147,7 +232,7 @@ def ingest_era5_day(utc_date: datetime, params: dict) -> dict:
         rh_data = synthetic['rh']
         blh_data = synthetic['blh']
     
-    height, width = rh_data.shape
+    height, width = rh_data.shape[-2:]  # Get last 2 dimensions
     profile = {
         "driver": "GTiff",
         "height": height,

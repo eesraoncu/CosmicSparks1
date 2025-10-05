@@ -1,5 +1,25 @@
 # Dust Nowcast & Alerts MVP (NASA Space Apps)
 
+## 🆕 Yeni Özellik: Akıllı Pipeline Sistemi
+
+**Tam otomatik sistem** - 81 il için:
+- ✅ En güncel gerçek veriyi otomatik bulur
+- ✅ Eksik verileri tahmin algoritması ile doldurur  
+- ✅ 3 ay geriye giderek kapsamlı analiz yapar
+- ✅ Tüm sonuçları veritabanına kaydeder
+
+```bash
+# Hemen başlat
+python run_intelligent_pipeline.py
+```
+
+📚 **Dokümantasyon:**
+- [Hızlı Başlangıç](QUICK_START.md) - 1 dakikada çalıştır
+- [Detaylı Kılavuz](INTELLIGENT_PIPELINE_GUIDE.md) - Tam dokümantasyon
+- [Sistem Özeti](SYSTEM_OVERVIEW.md) - Teknik detaylar
+
+---
+
 ## Overview
 This repository contains the **Yazılım A** (Data Ingest/QC) and **Yazılım B** (Modeling/Validation) complete pipeline for dust monitoring over Türkiye. The system provides:
 

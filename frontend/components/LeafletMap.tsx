@@ -70,7 +70,8 @@ const ProvinceMarker = ({
     popupAnchor: [0, -12],
   });
 
-  const airQuality = stats?.pm25 ? dataUtils.getAirQualityCategory(stats.pm25) : 'Veri Yok';
+  const airQuality = stats?.pm25 ? dataUtils.getAirQualityCategory(stats.pm25) : 'No Data';
+  const isForecast = stats?.data_quality_score === 0.7;
   
   return (
     <Marker 
@@ -84,6 +85,12 @@ const ProvinceMarker = ({
         <div className="p-3 min-w-[200px]">
           <h3 className="font-bold text-lg mb-2">{province.name}</h3>
           
+          {isForecast && (
+            <div className="mb-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full inline-block">
+              📊 Forecast Data
+            </div>
+          )}
+          
           {stats ? (
             <div className="space-y-2">
               <div className="flex justify-between">
@@ -94,7 +101,7 @@ const ProvinceMarker = ({
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-600">Hava Kalitesi:</span>
+                <span className="text-gray-600">Air Quality:</span>
                 <span className={`font-semibold ${
                   airQuality === 'Good' ? 'text-green-600' :
                   airQuality === 'Moderate' ? 'text-yellow-600' :
@@ -106,9 +113,9 @@ const ProvinceMarker = ({
               
               {stats.dust_event_detected && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Toz Durumu:</span>
+                  <span className="text-gray-600">Dust Status:</span>
                   <span className="font-semibold text-orange-600">
-                    {stats.dust_intensity || 'Tespit Edildi'}
+                    {stats.dust_intensity || 'Detected'}
                   </span>
                 </div>
               )}
@@ -121,14 +128,14 @@ const ProvinceMarker = ({
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-600">Veri Kalitesi:</span>
+                <span className="text-gray-600">Data Quality:</span>
                 <span className="font-semibold">
                   {Math.round((stats.data_quality_score || 0) * 100)}%
                 </span>
               </div>
             </div>
           ) : (
-            <p className="text-gray-500">Veri bulunamadı</p>
+            <p className="text-gray-500">No data available</p>
           )}
           
           <div className="mt-3 pt-2 border-t border-gray-200">
@@ -136,7 +143,7 @@ const ProvinceMarker = ({
               onClick={() => onSelect && onSelect(province.id)}
               className="text-primary-600 hover:text-primary-700 text-sm font-medium"
             >
-              Detayları Gör →
+              View Details →
             </button>
           </div>
         </div>
@@ -166,16 +173,16 @@ const MapUpdater = ({
 // Legend component
 const MapLegend = () => {
   const legendItems = [
-    { level: 'none', color: ALERT_LEVEL_COLORS.none, label: 'İyi (0-25 μg/m³)' },
-    { level: 'low', color: ALERT_LEVEL_COLORS.low, label: 'Orta (25-50 μg/m³)' },
-    { level: 'moderate', color: ALERT_LEVEL_COLORS.moderate, label: 'Hassas için Zararlı (50-75 μg/m³)' },
-    { level: 'high', color: ALERT_LEVEL_COLORS.high, label: 'Zararlı (75-150 μg/m³)' },
-    { level: 'extreme', color: ALERT_LEVEL_COLORS.extreme, label: 'Tehlikeli (150+ μg/m³)' },
+    { level: 'none', color: ALERT_LEVEL_COLORS.none, label: 'Good (0-8 μg/m³)' },
+    { level: 'low', color: ALERT_LEVEL_COLORS.low, label: 'Moderate (8-15 μg/m³)' },
+    { level: 'moderate', color: ALERT_LEVEL_COLORS.moderate, label: 'Unhealthy for Sensitive Groups (15-25 μg/m³)' },
+    { level: 'high', color: ALERT_LEVEL_COLORS.high, label: 'Unhealthy (25-50 μg/m³)' },
+    { level: 'extreme', color: ALERT_LEVEL_COLORS.extreme, label: 'Hazardous (50+ μg/m³)' },
   ];
 
   return (
     <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 z-[1000] max-w-xs">
-      <h4 className="font-semibold text-sm mb-3">PM2.5 Seviyeleri</h4>
+      <h4 className="font-semibold text-sm mb-3">PM2.5 Levels</h4>
       <div className="space-y-2">
         {legendItems.map((item) => (
           <div key={item.level} className="flex items-center text-xs">
@@ -188,8 +195,8 @@ const MapLegend = () => {
         ))}
       </div>
       <div className="mt-3 pt-2 border-t border-gray-200 text-xs text-gray-500">
-        <p>Kaynak: NASA MODIS, ECMWF CAMS</p>
-        <p>Güncelleme: {new Date().toLocaleDateString('tr-TR')}</p>
+        <p>Source: NASA MODIS, ECMWF CAMS</p>
+        <p>Updated: {new Date().toLocaleDateString('en-US')}</p>
       </div>
     </div>
   );
@@ -251,10 +258,10 @@ const LeafletMap: React.FC<LeafletMapProps> = ({
       <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 z-[1000]">
         <div className="flex items-center space-x-2">
           <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium">Canlı Veri</span>
+          <span className="text-sm font-medium">Live Data</span>
         </div>
         <div className="text-xs text-gray-500 mt-1">
-          {new Date().toLocaleTimeString('tr-TR', { 
+          {new Date().toLocaleTimeString('en-US', { 
             hour: '2-digit', 
             minute: '2-digit' 
           })}

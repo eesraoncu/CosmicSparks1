@@ -19,8 +19,8 @@ const MapPlaceholder = ({ height }: { height: string }) => (
   >
     <div className="text-center">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-      <p className="text-gray-600 font-medium">Türkiye Haritası Yükleniyor...</p>
-      <p className="text-sm text-gray-500 mt-2">🗺️ Canlı toz verileri hazırlanıyor</p>
+      <p className="text-gray-600 font-medium">Loading Turkey Map...</p>
+      <p className="text-sm text-gray-500 mt-2">🗺️ Live dust data is being prepared</p>
     </div>
   </div>
 );
@@ -39,17 +39,17 @@ const StaticMap = ({ provinces, stats, height }: DustMapProps) => {
     .filter(item => item.province);
 
   const getStatusColor = (pm25: number) => {
-    if (pm25 >= 75) return 'bg-red-500';
-    if (pm25 >= 50) return 'bg-orange-500';
-    if (pm25 >= 25) return 'bg-yellow-500';
+    if (pm25 >= 50) return 'bg-red-500';
+    if (pm25 >= 25) return 'bg-orange-500';
+    if (pm25 >= 15) return 'bg-yellow-500';
     return 'bg-green-500';
   };
 
   const getStatusText = (pm25: number) => {
-    if (pm25 >= 75) return 'Zararlı';
-    if (pm25 >= 50) return 'Hassas için Zararlı';
-    if (pm25 >= 25) return 'Orta';
-    return 'İyi';
+    if (pm25 >= 50) return 'Unhealthy';
+    if (pm25 >= 25) return 'Unhealthy for Sensitive Groups';
+    if (pm25 >= 15) return 'Moderate';
+    return 'Good';
   };
 
   return (
@@ -60,10 +60,10 @@ const StaticMap = ({ provinces, stats, height }: DustMapProps) => {
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white p-4">
         <h3 className="text-lg font-semibold flex items-center">
-          🌍 Türkiye Hava Kalitesi Durumu
+          🌍 Turkey Air Quality Status
         </h3>
         <p className="text-sm text-blue-100 mt-1">
-          Anlık PM2.5 ve toz konsantrasyonu verileri
+          Real-time PM2.5 and dust concentration data
         </p>
       </div>
 
@@ -84,7 +84,7 @@ const StaticMap = ({ provinces, stats, height }: DustMapProps) => {
                 </div>
                 
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Durum:</span>
+                  <span className="text-gray-600">Status:</span>
                   <span className={`font-semibold ${
                     (stat?.pm25 || 0) >= 50 ? 'text-red-600' : 
                     (stat?.pm25 || 0) >= 25 ? 'text-yellow-600' : 'text-green-600'
@@ -95,9 +95,9 @@ const StaticMap = ({ provinces, stats, height }: DustMapProps) => {
 
                 {stat?.dust_event_detected && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Toz:</span>
+                    <span className="text-gray-600">Dust:</span>
                     <span className="font-semibold text-orange-600">
-                      {stat.dust_intensity || 'Tespit Edildi'}
+                      {stat.dust_intensity || 'Detected'}
                     </span>
                   </div>
                 )}
@@ -108,31 +108,31 @@ const StaticMap = ({ provinces, stats, height }: DustMapProps) => {
 
         {/* Legend */}
         <div className="mt-6 pt-4 border-t border-gray-200">
-          <h4 className="font-medium text-gray-900 mb-3">PM2.5 Seviye Açıklaması</h4>
+          <h4 className="font-medium text-gray-900 mb-3">PM2.5 Levels</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div className="flex items-center">
               <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span>İyi (0-25)</span>
+              <span>Good (0-15)</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span>Orta (25-50)</span>
+              <span>Moderate (15-25)</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
-              <span>Hassas (50-75)</span>
+              <span>Unhealthy for Sensitive Groups (25-50)</span>
             </div>
             <div className="flex items-center">
               <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-              <span>Zararlı (75+)</span>
+              <span>Unhealthy (50+)</span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-500 text-center">
-          <p>📡 Veri Kaynağı: NASA MODIS, ECMWF CAMS | 🕐 Güncelleme: {new Date().toLocaleString('tr-TR')}</p>
-          <p className="mt-1">🌍 İnteraktif harita yükleniyor...</p>
+          <p>📡 Data Source: NASA MODIS, ECMWF CAMS | 🕐 Updated: {new Date().toLocaleString('en-US')}</p>
+          <p className="mt-1">🌍 Loading interactive map...</p>
         </div>
       </div>
     </div>
@@ -170,14 +170,14 @@ const DustMap: React.FC<DustMapProps> = (props) => {
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
             <div className="bg-white rounded-lg p-4 max-w-sm mx-4">
               <p className="text-center text-gray-700">
-                🗺️ İnteraktif harita yükleniyor...
+                🗺️ Loading interactive map...
               </p>
               <div className="mt-3 flex justify-center">
                 <button
                   onClick={() => setMapError(true)}
                   className="text-sm text-gray-500 hover:text-gray-700"
                 >
-                  Statik görünümde kal
+                  Stay on static view
                 </button>
               </div>
             </div>

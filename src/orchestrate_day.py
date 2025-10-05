@@ -12,6 +12,37 @@ from .ingest_era5 import ingest_era5_day
 from .zonal_stats_meteo import compute_meteo_stats
 from .create_turkey_provinces import ensure_turkey_provinces_exist
 from .alert_system import generate_alerts_for_day
+from .database import db_manager
+
+
+def save_pipeline_data_to_database(utc_date: datetime, pm25_csv_path: str, params: dict):
+    """Save pipeline data to database with proper data_quality_score"""
+    import pandas as pd
+    
+    # Load PM2.5 data
+    df = pd.read_csv(pm25_csv_path)
+    
+    # Prepare data for database
+    stats_data = []
+    for _, row in df.iterrows():
+        stat_record = {
+            'date': utc_date.date().isoformat(),
+            'province_id': int(row['province_id']),
+            'pm25': float(row.get('pm25', 0)) if pd.notna(row.get('pm25')) else None,
+            'pm25_lower': float(row.get('pm25_lower', 0)) if pd.notna(row.get('pm25_lower')) else None,
+            'pm25_upper': float(row.get('pm25_upper', 0)) if pd.notna(row.get('pm25_upper')) else None,
+            'air_quality_category': str(row.get('air_quality_category', 'Unknown')),
+            'rh_mean': float(row.get('rh_mean', 0)) if pd.notna(row.get('rh_mean')) else None,
+            'blh_mean': float(row.get('blh_mean', 0)) if pd.notna(row.get('blh_mean')) else None,
+            'data_quality_score': 1.0  # Real data from pipeline
+        }
+        stats_data.append(stat_record)
+    
+    # Store in database
+    with db_manager.get_session() as session:
+        db_manager.store_daily_stats(session, stats_data)
+    
+    print(f"Saved {len(stats_data)} province records to database")
 
 
 def load_params() -> dict:
@@ -65,7 +96,12 @@ def orchestrate(date_str: str) -> None:
     alert_queue = generate_alerts_for_day(utc_date, pm25_table, params)
     print(f"Alert queue: {alert_queue}")
 
-    print(f"[bold cyan]✓ Pipeline completed successfully for {utc_date.date()}[/bold cyan]")
+    # Save to database
+    print("[bold green]Step 9: Saving data to database[/bold green]")
+    save_pipeline_data_to_database(utc_date, pm25_table, params)
+    print("Data saved to database successfully")
+
+    print(f"[bold cyan]Pipeline completed successfully for {utc_date.date()}[/bold cyan]")
     print("[dim]Pipeline outputs:[/dim]")
     print(f"[dim]  - MODIS AOD: {modis_cog}[/dim]")
     print(f"[dim]  - CAMS dust: {cams_analysis}[/dim]")

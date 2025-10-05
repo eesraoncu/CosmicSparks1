@@ -166,12 +166,17 @@ def estimate_pm25_for_day(utc_date: datetime, stats_csv_path: str, params: dict,
     
     # Summary statistics
     print(f"PM2.5 estimates computed for {len(df)} provinces:")
-    print(f"  Mean PM2.5: {df['pm25'].mean():.1f} ± {df['pm25_uncertainty'].mean():.1f} μg/m³")
-    print(f"  Range: {df['pm25'].min():.1f} - {df['pm25'].max():.1f} μg/m³")
+    # Avoid console Unicode issues on Windows: replace ±, μ, ³ with ASCII
+    mean_pm = df['pm25'].mean()
+    mean_unc = df['pm25_uncertainty'].mean()
+    min_pm = df['pm25'].min()
+    max_pm = df['pm25'].max()
+    print(f"  Mean PM2.5: {mean_pm:.1f} +/- {mean_unc:.1f} ug/m3")
+    print(f"  Range: {min_pm:.1f} - {max_pm:.1f} ug/m3")
     
     unhealthy_provinces = df[df['pm25'] > 35]['province_name'].tolist()
     if unhealthy_provinces:
-        print(f"  Unhealthy levels (>35 μg/m³): {', '.join(unhealthy_provinces[:5])}")
+        print(f"  Unhealthy levels (>35 ug/m3): {', '.join(unhealthy_provinces[:5])}")
     
     dust_provinces = df[df['dust_event_detected']]['province_name'].tolist()
     if dust_provinces:
